@@ -6,7 +6,8 @@ import re
 import dotenv
 import os
 
-dotenv.load_dotenv()
+dotenv.load_dotenv('.env.development')
+dotenv.load_dotenv('.env')
 
 GOOGLE_AI_KEY = os.getenv('GOOGLE_AI_KEY')
 DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
@@ -38,6 +39,9 @@ safety_settings = [
 text_model = genai.GenerativeModel(model_name="gemini-pro", generation_config=text_generation_config, safety_settings=safety_settings)
 image_model = genai.GenerativeModel(model_name="gemini-pro-vision", generation_config=image_generation_config, safety_settings=safety_settings)
 
+bot_template = [
+	
+]
 
 #---------------------------------------------Discord Code-------------------------------------------------
 # Initialize Discord bot
@@ -89,7 +93,7 @@ async def on_message(message:discord.Message):
 async def generate_response_with_text(channel_id,message_text):
 	cleaned_text = clean_discord_message(message_text)
 	if not (channel_id in message_history):
-		message_history[channel_id] = text_model.start_chat(history=[])
+		message_history[channel_id] = text_model.start_chat(history=bot_template)
 	response = message_history[channel_id].send_message(cleaned_text)
 	return response.text
 
@@ -103,7 +107,11 @@ async def generate_response_with_image_and_text(image_data, text):
 
 @bot.tree.command(name='forget',description='Forget message history')
 async def forget(interaction:discord.Interaction):
-	message_history.pop(interaction.channel_id)
+	try:
+		message_history.pop(interaction.channel_id)
+	except Exception as e:
+		pass
+	await interaction.response.send_message("Message history for channel erased.")
 
 #---------------------------------------------Sending Messages-------------------------------------------------
 async def split_and_send_messages(message_system:discord.Message, text, max_length):
