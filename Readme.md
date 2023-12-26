@@ -10,7 +10,13 @@ Each channel/thread has it's own context and can be erased by using /forget.
 
 Due to API restrictions, the bot cannot remember image interactions.
 
-Current version erases anything between < and > so any mentions or emojis..
+Current version erases anything between < and > so any mentions or emojis
+
+## Requirements
+
+Get a Google Gemini api key from ai.google.dev
+
+Make a discord bot at discord.com/developers/applications
 
 ## Running
 
@@ -19,3 +25,12 @@ Install all dependencies as specified in requirements.txt
 Create a .env file and Add GOOGLE_AI_KEY and DISCORD_BOT_TOKEN in as specified in .env.development file file
 
 Run as python bot.py
+
+Optionally, you can add custom initial conversation for every chat by editing the bot_template variable as follows:
+
+bot_template = [
+	{'role':'user','parts': ["Hi!"]},
+	{'role':'model','parts': ["Hello! I am a Discord bot!"]},
+	{'role':'user','parts': ["Please give short and concise answers!"]},
+	{'role':'model','parts': ["I will try my best!"]},
+]
