@@ -3,45 +3,18 @@ import google.generativeai as genai
 from discord.ext import commands
 import aiohttp
 import re
-import dotenv
-import os
-
-dotenv.load_dotenv('.env.development')
-dotenv.load_dotenv('.env')
-
-GOOGLE_AI_KEY = os.getenv('GOOGLE_AI_KEY')
-DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
-
-message_history = {}
+import traceback
+from config import *
 
 #---------------------------------------------AI Configuration-------------------------------------------------
 
 # Configure the generative AI model
 genai.configure(api_key=GOOGLE_AI_KEY)
-text_generation_config = {
-	"temperature": 0.9,
-	"top_p": 1,
-	"top_k": 1,
-	"max_output_tokens": 512,
-}
-image_generation_config = {
-	"temperature": 0.4,
-	"top_p": 1,
-	"top_k": 32,
-	"max_output_tokens": 512,
-}
-safety_settings = [
-	{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-	{"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-	{"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-	{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
-]
+
 text_model = genai.GenerativeModel(model_name="gemini-pro", generation_config=text_generation_config, safety_settings=safety_settings)
 image_model = genai.GenerativeModel(model_name="gemini-pro-vision", generation_config=image_generation_config, safety_settings=safety_settings)
 
-bot_template = [
-	
-]
+message_history = {}
 
 #---------------------------------------------Discord Code-------------------------------------------------
 # Initialize Discord bot
@@ -58,44 +31,64 @@ async def on_message(message:discord.Message):
 	if not (bot.user.mentioned_in(message) or isinstance(message.channel, discord.DMChannel)):
 		return
 	#Start Typing to seem like something happened
-
-	async with message.channel.typing():
-		# Check for image attachments
-		if message.attachments:
-			print("New Image Message FROM:" + str(message.author.id) + ": " + message.content)
-			#Currently no chat history for images
-			for attachment in message.attachments:
-				#these are the only image extentions it currently accepts
-				if any(attachment.filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']):
-					await message.add_reaction('🎨')
-					
-					async with aiohttp.ClientSession() as session:
-						async with session.get(attachment.url) as resp:
-							if resp.status != 200:
-								await message.channel.send('Unable to download the image.')
+	try:
+		async with message.channel.typing():
+			# Check for image attachments
+			if message.attachments:
+				print("New Image Message FROM:" + str(message.author.id) + ": " + message.content)
+				#Currently no chat history for images
+				for attachment in message.attachments:
+					#these are the only image extentions it currently accepts
+					if any(attachment.filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']):
+						await message.add_reaction('🎨')
+						
+						async with aiohttp.ClientSession() as session:
+							async with session.get(attachment.url) as resp:
+								if resp.status != 200:
+									await message.channel.send('Unable to download the image.')
+									return
+								image_data = await resp.read()
+								response_text = await generate_response_with_image_and_text(image_data, message.content)
+								#Split the Message so discord does not get upset
+								await split_and_send_messages(message, response_text, 1700)
 								return
-							image_data = await resp.read()
-							response_text = await generate_response_with_image_and_text(image_data, message.content)
-							#Split the Message so discord does not get upset
-							await split_and_send_messages(message, response_text, 1700)
-							return
-		#Not an Image do text response
-		else:
-			print("New Message FROM:" + str(message.author.id) + ": " + message.content)
-			#Check if history is disabled just send response
-			response_text = await generate_response_with_text(message.channel.id,message.content)
-			#Split the Message so discord does not get upset
-			await split_and_send_messages(message, response_text, 1700)
-			return
-	   
+			#Not an Image do text response
+			else:
+				print("New Message FROM:" + str(message.author.id) + ": " + message.content)
+				#Check if history is disabled just send response
+				response_text = await generate_response_with_text(message.channel.id,message.content)
+				#Split the Message so discord does not get upset
+				await split_and_send_messages(message, response_text, 1700)
+				return
+	except Exception as e:
+		# traceback.print_exc()
+		await message.reply('Some error has occurred, please check logs!')
+
+
 #---------------------------------------------AI Generation History-------------------------------------------------		   
 
 async def generate_response_with_text(channel_id,message_text):
-	cleaned_text = clean_discord_message(message_text)
-	if not (channel_id in message_history):
-		message_history[channel_id] = text_model.start_chat(history=bot_template)
-	response = message_history[channel_id].send_message(cleaned_text)
-	return response.text
+	try:
+		cleaned_text = clean_discord_message(message_text)
+		if not (channel_id in message_history):
+			message_history[channel_id] = text_model.start_chat(history=bot_template)
+		response = message_history[channel_id].send_message(cleaned_text)
+		return response.text
+	except Exception as e:
+		with open('errors.log','a+') as errorlog:
+			errorlog.write('\n##########################\n')
+			errorlog.write('Message: '+message_text)
+			errorlog.write('\n-------------------\n')
+			errorlog.write('Traceback:\n'+traceback.format_exc())
+			errorlog.write('\n-------------------\n')
+			errorlog.write('History:\n'+str(message_history[channel_id].history))
+			errorlog.write('\n-------------------\n')
+			errorlog.write('Candidates:\n'+str(response.candidates))
+			errorlog.write('\n-------------------\n')
+			errorlog.write('Parts:\n'+str(response.parts))
+			errorlog.write('\n-------------------\n')
+			errorlog.write('Prompt feedbacks:\n'+str(response.prompt_feedbacks))
+
 
 async def generate_response_with_image_and_text(image_data, text):
 	image_parts = [{"mime_type": "image/jpeg", "data": image_data}]
