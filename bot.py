@@ -19,6 +19,7 @@ message_history = {}
 #---------------------------------------------Discord Code-------------------------------------------------
 # Initialize Discord bot
 intents = discord.Intents.default()
+intents.message_content = True
 bot = commands.Bot(command_prefix=[], intents=intents,help_command=None,activity=discord.Game('with your feelings'))
 
 #On Message Function
@@ -55,12 +56,19 @@ async def on_message(message:discord.Message):
 			#Not an Image do text response
 			else:
 				print("FROM:" + str(message.author.name) + ": " + message.content)
-				response_text = await generate_response_with_text(message.channel.id,"@"+message.author.name+" said "+message.clean_content)
+				query = f"@{message.author.name} said \"{message.clean_content}\""
+
+				# Fetch message that is being replied to
+				if message.reference is not None:
+					reply_message = await message.channel.fetch_message(message.reference.message_id)
+					if reply_message.author.id != bot.user.id:
+						query = f"{query} while quoting @{reply_message.author.name} \"{reply_message.clean_content}\""
+
+				response_text = await generate_response_with_text(message.channel.id, query)
 				#Split the Message so discord does not get upset
 				await split_and_send_messages(message, response_text, 1700)
 				return
 	except Exception as e:
-		# traceback.print_exc()
 		await message.reply('Some error has occurred, please check logs!')
 
 
