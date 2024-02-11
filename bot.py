@@ -5,10 +5,10 @@ import aiohttp
 import re
 import traceback
 from config import *
+from discord import app_commands
+from typing import Optional
 
 #---------------------------------------------AI Configuration-------------------------------------------------
-
-# Configure the generative AI model
 genai.configure(api_key=GOOGLE_AI_KEY)
 
 text_model = genai.GenerativeModel(model_name="gemini-pro", generation_config=text_generation_config, safety_settings=safety_settings)
@@ -54,9 +54,8 @@ async def on_message(message:discord.Message):
 								return
 			#Not an Image do text response
 			else:
-				print("New Message FROM:" + str(message.author.id) + ": " + message.content)
-				#Check if history is disabled just send response
-				response_text = await generate_response_with_text(message.channel.id,message.content)
+				print("FROM:" + str(message.author.name) + ": " + message.content)
+				response_text = await generate_response_with_text(message.channel.id,"@"+message.author.name+" said "+message.clean_content)
 				#Split the Message so discord does not get upset
 				await split_and_send_messages(message, response_text, 1700)
 				return
@@ -69,10 +68,10 @@ async def on_message(message:discord.Message):
 
 async def generate_response_with_text(channel_id,message_text):
 	try:
-		cleaned_text = clean_discord_message(message_text)
+		formatted_text = format_discord_message(message_text)
 		if not (channel_id in message_history):
 			message_history[channel_id] = text_model.start_chat(history=bot_template)
-		response = message_history[channel_id].send_message(cleaned_text)
+		response = message_history[channel_id].send_message(formatted_text)
 		return response.text
 	except Exception as e:
 		with open('errors.log','a+') as errorlog:
@@ -99,9 +98,15 @@ async def generate_response_with_image_and_text(image_data, text):
 	return response.text
 
 @bot.tree.command(name='forget',description='Forget message history')
-async def forget(interaction:discord.Interaction):
+@app_commands.describe(persona='Persona of bot')
+async def forget(interaction:discord.Interaction,persona:Optional[str] = None):
 	try:
 		message_history.pop(interaction.channel_id)
+		if persona:
+			temp_template = bot_template.copy()
+			temp_template.append({'role':'user','parts': ["Forget what I said earlier! You are "+persona]})
+			temp_template.append({'role':'model','parts': ["Ok!"]})
+			message_history[interaction.channel_id] = text_model.start_chat(history=temp_template)
 	except Exception as e:
 		pass
 	await interaction.response.send_message("Message history for channel erased.")
@@ -118,12 +123,10 @@ async def split_and_send_messages(message_system:discord.Message, text, max_leng
 	for string in messages:
 		message_system = await message_system.reply(string)	
 
-def clean_discord_message(input_string):
-	# Create a regular expression pattern to match text between < and >
-	bracket_pattern = re.compile(r'<[^>]+>')
-	# Replace text between brackets with an empty string
-	cleaned_content = bracket_pattern.sub('', input_string)
-	return cleaned_content  
+def format_discord_message(input_string):
+	# Replace emoji with name
+	cleaned_content = re.sub(r'<(:[^:]+:)[^>]+>',r'\1', input_string)
+	return cleaned_content
 
 
 
