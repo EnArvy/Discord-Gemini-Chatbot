@@ -6,7 +6,7 @@ import re
 import traceback
 from config import *
 from discord import app_commands
-from typing import Optional
+from typing import Optional, Dict
 
 #---------------------------------------------AI Configuration-------------------------------------------------
 genai.configure(api_key=GOOGLE_AI_KEY)
@@ -14,7 +14,7 @@ genai.configure(api_key=GOOGLE_AI_KEY)
 text_model = genai.GenerativeModel(model_name="gemini-pro", generation_config=text_generation_config, safety_settings=safety_settings)
 image_model = genai.GenerativeModel(model_name="gemini-pro-vision", generation_config=image_generation_config, safety_settings=safety_settings)
 
-message_history = {}
+message_history:Dict[int, genai.ChatSession] = {}
 
 #---------------------------------------------Discord Code-------------------------------------------------
 # Initialize Discord bot
@@ -29,7 +29,7 @@ async def on_message(message:discord.Message):
 	if message.author == bot.user:
 		return
 	# Check if the bot is mentioned or the message is a DM
-	if not (bot.user.mentioned_in(message) or isinstance(message.channel, discord.DMChannel)):
+	if not (bot.user.mentioned_in(message) or isinstance(message.channel, discord.DMChannel) or message.channel.id in tracked_channels):
 		return
 	#Start Typing to seem like something happened
 	try:
@@ -118,6 +118,16 @@ async def forget(interaction:discord.Interaction,persona:Optional[str] = None):
 	except Exception as e:
 		pass
 	await interaction.response.send_message("Message history for channel erased.")
+
+@bot.tree.command(name='createthread',description='Create a thread in which bot will respond to every message.')
+@app_commands.describe(name='Thread name')
+async def create_thread(interaction:discord.Interaction,name:str):
+	try:
+		thread = await interaction.channel.create_thread(name=name,auto_archive_duration=60)
+		tracked_channels.append(thread.id)
+		await interaction.response.send_message(f"Thread {name} created!")
+	except Exception as e:
+		await interaction.response.send_message("Error creating thread!")
 
 #---------------------------------------------Sending Messages-------------------------------------------------
 async def split_and_send_messages(message_system:discord.Message, text, max_length):

@@ -7,6 +7,11 @@ dotenv.load_dotenv('.env.development')
 GOOGLE_AI_KEY = os.getenv('GOOGLE_AI_KEY')
 DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 
+tracked_channels = [
+	# channel_id_1,
+	# thread_id_2,
+]
+
 text_generation_config = {
 	"temperature": 0.9,
 	"top_p": 1,
