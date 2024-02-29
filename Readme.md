@@ -1,5 +1,10 @@
 # Discord Bot to interact with Gemini API as ChatBot
 
+## Preview
+
+![Preview](https://i.imgur.com/j3CU5EF.png)
+
+
 Inspiration - https://github.com/Echoshard/Gemini_Discordbot
 
 This bot acts as a Chatbot. It uses Google's Gemini API which is free for upto 60 calls/min as of Jan 2023.
@@ -13,9 +18,6 @@ Each channel/thread has it's own context and can be erased by using /forget.
 Additionally, a persona can be specified while making it forget history.
 
 Due to API restrictions, the bot cannot remember image interactions.
-
-## Preview
-![Preview](https://i.imgur.com/j3CU5EF.png)
 
 ## Requirements
 
@@ -35,7 +37,7 @@ Run as `python bot.py`
 
 ## Customization
 
-Optionally, you can configure the bot as follows using config.py:
+Optionally, you can configure the bot as follows using `config.py`:
 
 Add custom initial conversation for every chat by editing the bot_template variable as follows:
 
