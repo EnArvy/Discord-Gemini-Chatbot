@@ -4,13 +4,18 @@ Inspiration - https://github.com/Echoshard/Gemini_Discordbot
 
 This bot acts as a Chatbot. It uses Google's Gemini API which is free for upto 60 calls/min as of Jan 2023.
 
+## Usage
+
 The bot can be talked to by mentioning it or DMing it.
 
 Each channel/thread has it's own context and can be erased by using /forget.
 
+Additionally, a persona can be specified while making it forget history.
+
 Due to API restrictions, the bot cannot remember image interactions.
 
-Current version erases anything between < and > so any mentions or emojis
+## Preview
+![Preview](https://i.imgur.com/j3CU5EF.png)
 
 ## Requirements
 
@@ -55,4 +60,8 @@ safety_settings = [
 
 Change AI generation parameters using the variables text_generation_config and image_generation_config
 
+## Misc
+
 Error logs are stored in the errors.log file created at runtime.
+
+Chat data is stored between bot runs using shelve.
