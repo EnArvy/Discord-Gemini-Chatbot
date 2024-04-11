@@ -38,7 +38,7 @@ async def on_message(message:discord.Message):
 	if message.author == bot.user:
 		return
 	# Ignore messages sent to everyone
-	if '@everyone' in message.content:
+	if message.mention_everyone:
 		return
 	# Check if the bot is mentioned or the message is a DM
 	if not (bot.user.mentioned_in(message) or isinstance(message.channel, discord.DMChannel) or message.channel.id in tracked_channels or message.channel.id in tracked_threads):
