@@ -9,6 +9,8 @@ Inspiration - https://github.com/Echoshard/Gemini_Discordbot
 
 This bot acts as a Chatbot. It uses Google's Gemini API which is free for upto 60 calls/min as of Jan 2023.
 
+### Supports images and Gemini 1.5 completely!
+
 ## Usage
 
 The bot can be talked to by mentioning it or DMing it.

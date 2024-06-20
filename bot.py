@@ -2,7 +2,6 @@ import discord
 import google.generativeai as genai
 from discord.ext import commands
 import aiohttp
-import re
 import traceback
 from config import *
 from discord import app_commands
@@ -12,8 +11,7 @@ import shelve
 #---------------------------------------------AI Configuration-------------------------------------------------
 genai.configure(api_key=GOOGLE_AI_KEY)
 
-text_model = genai.GenerativeModel(model_name="gemini-pro", generation_config=text_generation_config, safety_settings=safety_settings)
-image_model = genai.GenerativeModel(model_name="gemini-pro-vision", generation_config=image_generation_config, safety_settings=safety_settings)
+model = genai.GenerativeModel(model_name="gemini-1.5-pro", generation_config=text_generation_config, safety_settings=safety_settings)
 
 message_history:Dict[int, genai.ChatSession] = {}
 tracked_threads = []
@@ -23,7 +21,7 @@ with shelve.open('chatdata') as file:
 		tracked_threads = file['tracked_threads']
 	for key in file.keys():
 		if key.isnumeric():
-			message_history[int(key)] = text_model.start_chat(history=file[key])
+			message_history[int(key)] = model.start_chat(history=file[key])
 
 #---------------------------------------------Discord Code-------------------------------------------------
 # Initialize Discord bot
@@ -46,42 +44,45 @@ async def on_message(message:discord.Message):
 	#Start Typing to seem like something happened
 	try:
 		async with message.channel.typing():
-			# Check for image attachments
-			if message.attachments:
-				print("New Image Message FROM:" + str(message.author.id) + ": " + message.content)
-				#Currently no chat history for images
+			print("FROM:" + str(message.author.name) + ": " + message.content)
+			query = ""
+			# Check if the message has attachments
+			images = []
+			if not message.attachments:
+				query = f"@{message.author.name} said \"{message.clean_content}\""
+			else:
+				# Check if empty message
+				if not message.content:
+					query = f"@{message.author.name} sent an image"
+				else:
+					query = f"@{message.author.name} said \"{message.clean_content}\" while sending an image"
+				
 				for attachment in message.attachments:
+					print("Attachment")
 					#these are the only image extentions it currently accepts
 					if any(attachment.filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']):
-						await message.add_reaction('🎨')
-						
 						async with aiohttp.ClientSession() as session:
 							async with session.get(attachment.url) as resp:
 								if resp.status != 200:
 									await message.channel.send('Unable to download the image.')
 									return
 								image_data = await resp.read()
-								response_text = await generate_response_with_image_and_text(image_data, message.content)
-								#Split the Message so discord does not get upset
-								await split_and_send_messages(message, response_text, 1700)
-								return
-			#Not an Image do text response
-			else:
-				print("FROM:" + str(message.author.name) + ": " + message.content)
-				query = f"@{message.author.name} said \"{message.clean_content}\""
+								images.append({"mime_type": "image/jpeg", "data": image_data})
 
-				# Fetch message that is being replied to
-				if message.reference is not None:
-					reply_message = await message.channel.fetch_message(message.reference.message_id)
-					if reply_message.author.id != bot.user.id:
-						query = f"{query} while quoting @{reply_message.author.name} \"{reply_message.clean_content}\""
+			# Check if message is quoting someone
+			if message.reference is not None:
+				reply_message = await message.channel.fetch_message(message.reference.message_id)
+				if reply_message.author.id != bot.user.id:
+					query = f"{query} while quoting @{reply_message.author.name} \"{reply_message.clean_content}\""
 
-				response_text = await generate_response_with_text(message.channel.id, query)
-				#Split the Message so discord does not get upset
-				await split_and_send_messages(message, response_text, 1700)
-				with shelve.open('chatdata') as file:
-					file[str(message.channel.id)] = message_history[message.channel.id].history
-				return
+			response_text = await generate_response(message.channel.id,images, query)
+
+		#Split the Message so discord does not get upset
+		await split_and_send_messages(message, response_text, 1700)
+		with shelve.open('chatdata') as file:
+			file[str(message.channel.id)] = message_history[message.channel.id].history
+		return
+		
 	except Exception as e:
 		traceback.print_exc()
 		await message.reply('Some error has occurred, please check logs!')
@@ -89,36 +90,28 @@ async def on_message(message:discord.Message):
 
 #---------------------------------------------AI Generation History-------------------------------------------------		   
 
-async def generate_response_with_text(channel_id,message_text):
+async def generate_response(channel_id,images,text):
 	try:
-		formatted_text = format_discord_message(message_text)
+		prompt_parts = images
+		prompt_parts.append(text)
 		if not (channel_id in message_history):
-			message_history[channel_id] = text_model.start_chat(history=bot_template)
-		response = message_history[channel_id].send_message(formatted_text)
+			message_history[channel_id] = model.start_chat(history=bot_template)
+		response = message_history[channel_id].send_message(prompt_parts)
 		return response.text
 	except Exception as e:
-		with open('errors.log','a+') as errorlog:
+		with open('errors.log','a+',encoding='utf-8') as errorlog:
 			errorlog.write('\n##########################\n')
-			errorlog.write('Message: '+message_text)
+			errorlog.write('Message: '+text)
 			errorlog.write('\n-------------------\n')
 			errorlog.write('Traceback:\n'+traceback.format_exc())
 			errorlog.write('\n-------------------\n')
-			errorlog.write('History:\n'+str(message_history[channel_id].history))
+			errorlog.write(f'History:\n{str(message_history[channel_id].history)}')
 			errorlog.write('\n-------------------\n')
 			errorlog.write('Candidates:\n'+str(response.candidates))
 			errorlog.write('\n-------------------\n')
 			errorlog.write('Parts:\n'+str(response.parts))
 			errorlog.write('\n-------------------\n')
 			errorlog.write('Prompt feedbacks:\n'+str(response.prompt_feedbacks))
-
-
-async def generate_response_with_image_and_text(image_data, text):
-	image_parts = [{"mime_type": "image/jpeg", "data": image_data}]
-	prompt_parts = [image_parts[0], f"\n{text if text else 'What is this a picture of?'}"]
-	response = image_model.generate_content(prompt_parts)
-	if(response._error):
-		return "❌" +  str(response._error)
-	return response.text
 
 @bot.tree.command(name='forget',description='Forget message history')
 @app_commands.describe(persona='Persona of bot')
@@ -129,7 +122,7 @@ async def forget(interaction:discord.Interaction,persona:Optional[str] = None):
 			temp_template = bot_template.copy()
 			temp_template.append({'role':'user','parts': ["Forget what I said earlier! You are "+persona]})
 			temp_template.append({'role':'model','parts': ["Ok!"]})
-			message_history[interaction.channel_id] = text_model.start_chat(history=temp_template)
+			message_history[interaction.channel_id] = model.start_chat(history=temp_template)
 	except Exception as e:
 		pass
 	await interaction.response.send_message("Message history for channel erased.")
@@ -157,14 +150,6 @@ async def split_and_send_messages(message_system:discord.Message, text, max_leng
 	# Send each part as a separate message
 	for string in messages:
 		message_system = await message_system.reply(string)	
-
-def format_discord_message(input_string):
-	# Replace emoji with name
-	cleaned_content = re.sub(r'<(:[^:]+:)[^>]+>',r'\1', input_string)
-	return cleaned_content
-
-
-
 
 #---------------------------------------------Run Bot-------------------------------------------------
 @bot.event
