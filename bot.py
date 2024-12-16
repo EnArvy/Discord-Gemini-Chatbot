@@ -76,7 +76,9 @@ async def on_message(message: discord.Message):
 			# Generate response using Gemini API
 			response_text = await generate_response(message.channel.id, attachments, query)
 
-			await message.channel.send(response_text)
+			await split_and_send_messages(message, response_text, 1700)
+			with shelve.open('chatdata') as file:
+				file[str(message.channel.id)] = message_history[message.channel.id].history
 	except Exception as e:
 		print(f"Error: {e}")
 		print(traceback.format_exc())
@@ -119,7 +121,9 @@ async def generate_response(channel_id,attachments,text):
 	try:
 		prompt_parts = attachments
 		prompt_parts.append(text)
-		response = await model.generate_content_async(prompt_parts)
+		if not (channel_id in message_history):
+			message_history[channel_id] = model.start_chat(history=bot_template)
+		response = await message_history[channel_id].send_message_async(prompt_parts)
 		return response.text
 	except Exception as e:
 		with open('errors.log','a+',encoding='utf-8') as errorlog:
