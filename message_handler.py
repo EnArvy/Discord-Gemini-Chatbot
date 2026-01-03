@@ -151,7 +151,7 @@ async def handle_message(message: Message, ai_service, storage_manager) -> None:
             query = await construct_query(message, attachments)
             
             # Generate response
-            response_text = await ai_service.generate_response(
+            response_text = ai_service.generate_response(
                 message.channel.id,
                 attachments,
                 query
