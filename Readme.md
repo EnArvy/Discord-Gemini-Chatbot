@@ -35,16 +35,16 @@ Install all dependencies as specified in requirements.txt
 
 Create a .env file and add GOOGLE_AI_KEY and DISCORD_BOT_TOKEN in as specified in .env.development file
 
-Run as `python bot.py`
+Run as `python main.py`
 
 ## Customization
 
-Optionally, you can configure the bot as follows using `config.py`:
+Optionally, you can configure the bot as follows using `settings.py`:
 
-Add custom initial conversation for every chat by editing the bot_template variable as follows:
+Add custom initial conversation for every chat by editing the BOT_TEMPLATE variable as follows:
 
 ```
-bot_template = [
+BOT_TEMPLATE = [
 	{'role':'user','parts': ["Hi!"]},
 	{'role':'model','parts': ["Hello! I am a Discord bot!"]},
 	{'role':'user','parts': ["Please give short and concise answers!"]},
@@ -54,7 +54,7 @@ bot_template = [
 
 Change content safety settings as follows:
 ```
-safety_settings = [
+SAFETY_SETTINGS = [
 	{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
 	{"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
 	{"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
@@ -62,7 +62,7 @@ safety_settings = [
 ]
 ```
 
-Change AI generation parameters using the variables text_generation_config and image_generation_config
+Change AI generation parameters using the variables TEXT_GENERATION_CONFIG and IMAGE_GENERATION_CONFIG
 
 ## Misc
 

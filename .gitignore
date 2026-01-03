@@ -5,3 +5,6 @@ __pycache__
 chatdata.bak
 chatdata.dat
 chatdata.dir
+chatdata.db
+.vscode
+.DS_Store
